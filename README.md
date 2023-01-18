@@ -1,0 +1,4 @@
+- [x] Download videos from given urls
+- [ ] Download more than 30 videos
+- [ ] Retry 3 times if there is 403 status code when downloading videos
+- [ ] Download only 1 video from a given url
