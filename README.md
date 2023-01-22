@@ -1,4 +1,9 @@
 - [x] Download videos from given urls
-- [ ] Download more than 30 videos
-- [ ] Retry 3 times if there is 403 status code when downloading videos
+- [x] Infinite scroll before scraping
+- [x] Retry until downloading videos successfully
 - [ ] Download only 1 video from a given url
+- [x] Download tiktok videos without Watermark
+- [x] Add logger
+- [ ] Auto bypassing tiktok captcha
+- [ ] Scrape video captions and rename downloaded files
+- [ ] Convert to TypeScript

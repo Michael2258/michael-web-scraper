@@ -16,6 +16,6 @@
     "node-fetch": "^3.3.0",
     "puppeteer": "^19.4.1",
     "request-promise": "^4.2.6",
-    "tiktok-captcha-solver": "0.0.9"
+    "tiktok-scraper-without-watermark": "git+https://github.com/MRHRTZ/Tiktok-Scraper-Without-Watermark.git"
   }
 }

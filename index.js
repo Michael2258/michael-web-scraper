@@ -2,23 +2,59 @@ import puppeteer from "puppeteer"
 import fs from "fs"
 import axios from "axios"
 import net from "net"
+import { tiktokdownload } from "tiktok-scraper-without-watermark"
+
+async function logger(logs) {
+  try {
+    const logFilePath = process.cwd() + "/debug.log"
+
+    if (await checkFileExist(logFilePath)) {
+      await fs.promises.appendFile(logFilePath, logs + "\n")
+    } else {
+      const logStream = fs.createWriteStream(logFilePath)
+      logStream.write(logs + "\n")
+      logStream.end("Done logging.")
+    }
+  } catch (error) {
+    console.log(`Error while logging. ${error}`)
+  }
+}
+
+async function checkFileExist(filePath) {
+  try {
+    return fs.promises
+      .access(filePath, fs.constants.F_OK)
+      .then(() => true)
+      .catch(() => false)
+  } catch (error) {
+    await logger(`Error while checking file exist. ${error}`)
+  }
+}
 
 async function scrapeVideo(browser, videoUrl, index) {
   try {
+    const isExist = await checkFileExist(`${index}.mp4`)
+    if (isExist) {
+      await logger(`File ${index}.mp4 has already existed.`)
+      return
+    }
+
     let page = await browser.newPage()
     await page.goto(videoUrl, { waitUntil: "domcontentloaded", timeout: 0 })
 
     await page.waitForSelector("video[mediatype=video]")
 
-    let videoPath = await (
-      await page.$("video[mediatype=video]")
-    ).evaluate((node) => node.getAttribute("src"))
-
-    await download(videoPath, index)
-
+    await downloadNoWM(videoUrl, index)
     await page.close()
+
+    const isExistAfterDownloading = await checkFileExist(`${index}.mp4`)
+
+    if (isExistAfterDownloading) return
+
+    await logger(`Re-download file ${idx}.mp4...`)
+    await scrapeVideo(browser, videoUrl, index)
   } catch (error) {
-    console.log({ error })
+    await logger(`Error while scraping video. ${error}`)
   }
 }
 
@@ -30,30 +66,60 @@ async function scrapeCreator(browser, username) {
       timeout: 0,
     })
 
+    await page.setViewport({
+      width: 1200,
+      height: 800,
+    })
+
+    await autoScroll(page)
+
     await page.waitForSelector('div[data-e2e="user-post-item"] a')
 
     let links = await page.$$('div[data-e2e="user-post-item"] a')
+
     let index = 0
 
     for (const link of links) {
       try {
         index++
+
         const url = await link.evaluate((node) => node.getAttribute("href"))
-        // videoLinks.push(await link.evaluate((node) => node.getAttribute("href")))
         await scrapeVideo(browser, url, index)
       } catch (error) {
-        console.log({ error })
         continue
       }
     }
 
     await page.close()
   } catch (error) {
-    console.log(error)
+    await logger(`Error while scraping creator. ${error}`)
   }
 }
 
-async function findTopVideoCreators(browser, query) {
+async function autoScroll(page) {
+  await page.evaluate(async () => {
+    await new Promise((resolve) => {
+      var totalHeight = 0
+      var distance = 100
+      var timer = setInterval(() => {
+        var scrollHeight = document.body.scrollHeight
+        window.scrollBy({
+          left: 0,
+          top: distance,
+          behavior: "smooth",
+        })
+        totalHeight += distance
+
+        if (totalHeight >= scrollHeight - window.innerHeight) {
+          clearInterval(timer)
+          resolve()
+        }
+      }, 400)
+    })
+  })
+}
+
+async function findTopCreators(browser, query) {
   try {
     let page = await browser.newPage()
 
@@ -79,13 +145,26 @@ async function findTopVideoCreators(browser, query) {
     await page.close()
     return userLinks
   } catch (error) {
-    console.log({ error })
+    await logger(`Error while finding top creators. ${error}`)
+  }
+}
+
+async function downloadNoWM(path, idx) {
+  try {
+    const result = await tiktokdownload(path)
+
+    if (result) {
+      await download(result.nowm, idx)
+    }
+  } catch (error) {
+    await logger(
+      `Error while downloading video without Watermark: ${idx}.mp4 - path ${path}. ${error}`
+    )
   }
 }
 
 async function download(path, idx) {
   try {
-    console.log(path)
     await axios({
       method: "GET",
       url: path,
@@ -134,7 +213,7 @@ async function download(path, idx) {
         socket.destroy()
       })
       .listen(843)
-    console.log({ "Error download": error })
+    await logger(`Error while downloading video. ${error}`)
   }
 }
 
@@ -144,12 +223,12 @@ async function run(query) {
     ignoreHTTPSErrors: true,
     args: [`--window-size=1920,1080`],
     defaultViewport: {
-      width: 1920,
-      height: 1080,
+      width: 1200,
+      height: 800,
     },
   })
 
-  let creatorNames = await findTopVideoCreators(browser, query)
+  let creatorNames = await findTopCreators(browser, query)
 
   console.log(creatorNames.slice(0, 3))
 
