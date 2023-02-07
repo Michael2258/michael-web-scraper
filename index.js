@@ -3,6 +3,7 @@ import fs from "fs"
 import axios from "axios"
 import net from "net"
 import { tiktokdownload } from "tiktok-scraper-without-watermark"
+import path from "path"
 
 async function logger(logs) {
   try {
@@ -31,34 +32,64 @@ async function checkFileExist(filePath) {
   }
 }
 
-async function scrapeVideo(browser, videoUrl, index) {
-  try {
-    const isExist = await checkFileExist(`${index}.mp4`)
-    if (isExist) {
-      await logger(`File ${index}.mp4 has already existed.`)
-      return
-    }
+async function scrapeVideo(browser, videoUrl, directory) {
+  let page = await browser.newPage()
 
-    let page = await browser.newPage()
+  try {
     await page.goto(videoUrl, { waitUntil: "domcontentloaded", timeout: 0 })
 
+    await page.waitForSelector('[data-e2e="browser-nickname"]')
+
+    const videoId = videoUrl.toString().split("/")[
+      videoUrl.toString().split("/").length - 1
+    ]
+
+    const videoIdInBinary = BigInt(videoId).toString(2)
+    const videoIdInBinary32LeftMost = videoIdInBinary.substring(0, 31)
+    const unixTimestampInSecond = parseInt(videoIdInBinary32LeftMost, 2)
+    const createdDate = new Date(unixTimestampInSecond * 1000)
+
+    const fileName = `${
+      createdDate.getDate() +
+      "-" +
+      createdDate.getMonth() +
+      "-" +
+      createdDate.getFullYear() +
+      "_" +
+      createdDate.getHours() +
+      "-" +
+      createdDate.getMinutes() +
+      "-" +
+      createdDate.getSeconds()
+    }.mp4`
+
+    const isExist = await checkFileExist(`${directory}/${fileName}`)
+    if (isExist) {
+      await logger(`File ${fileName} has already existed.`)
+      return
+    }
     await page.waitForSelector("video[mediatype=video]")
 
-    await downloadNoWM(videoUrl, index)
+    // const filePath = path.join(directory, fileName)
+
+    await downloadNoWM(videoUrl, `${directory}/${fileName}`)
     await page.close()
 
-    const isExistAfterDownloading = await checkFileExist(`${index}.mp4`)
+    const isExistAfterDownloading = await checkFileExist(
+      `${directory}/${fileName}`
+    )
 
     if (isExistAfterDownloading) return
 
-    await logger(`Re-download file ${idx}.mp4...`)
-    await scrapeVideo(browser, videoUrl, index)
+    await logger(`Re-download file ${fileName}...`)
+    await scrapeVideo(browser, videoUrl, directory)
   } catch (error) {
+    await page.close()
     await logger(`Error while scraping video. ${error}`)
   }
 }
 
-async function scrapeCreator(browser, username) {
+async function scrapeCreator(browser, username, directory) {
   try {
     let page = await browser.newPage()
     await page.goto("http://tiktok.com/" + username, {
@@ -77,14 +108,10 @@ async function scrapeCreator(browser, username) {
 
     let links = await page.$$('div[data-e2e="user-post-item"] a')
 
-    let index = 0
-
     for (const link of links) {
       try {
-        index++
-
         const url = await link.evaluate((node) => node.getAttribute("href"))
-        await scrapeVideo(browser, url, index)
+        await scrapeVideo(browser, url, directory)
       } catch (error) {
         continue
       }
@@ -149,21 +176,21 @@ async function findTopCreators(browser, query) {
   }
 }
 
-async function downloadNoWM(path, idx) {
+async function downloadNoWM(path, fileNameWithFolder) {
   try {
     const result = await tiktokdownload(path)
 
     if (result) {
-      await download(result.nowm, idx)
+      await download(result.nowm, fileNameWithFolder)
     }
   } catch (error) {
     await logger(
-      `Error while downloading video without Watermark: ${idx}.mp4 - path ${path}. ${error}`
+      `Error while downloading video without Watermark: ${fileNameWithFolder} - path ${path}. ${error}`
     )
   }
 }
 
-async function download(path, idx) {
+async function download(path, fileNameWithFolder) {
   try {
     await axios({
       method: "GET",
@@ -172,7 +199,7 @@ async function download(path, idx) {
     })
       .then((response) => {
         return new Promise((resolve, reject) => {
-          const fileName = `${idx}.mp4`
+          const fileName = fileNameWithFolder
           const file = fs.createWriteStream(fileName)
           response.data.pipe(file)
 
@@ -230,11 +257,15 @@ async function run(query) {
 
   let creatorNames = await findTopCreators(browser, query)
 
-  console.log(creatorNames.slice(0, 3))
+  const dir = `./${creatorNames[0]}`
 
-  await scrapeCreator(browser, creatorNames[0])
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir)
+  }
+
+  await scrapeCreator(browser, creatorNames[0], dir)
 
   await browser.close()
 }
 
-run("redvelvet_smtown")
+run("@username")

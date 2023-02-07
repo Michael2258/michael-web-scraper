@@ -5,5 +5,5 @@
 - [x] Download tiktok videos without Watermark
 - [x] Add logger
 - [ ] Auto bypassing tiktok captcha
-- [ ] Scrape video captions and rename downloaded files
+- [x] Scrape video captions and rename downloaded files
 - [ ] Convert to TypeScript
