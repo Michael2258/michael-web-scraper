@@ -1,3 +1,5 @@
+## To-do List
+
 - [x] Download videos from given urls
 - [x] Infinite scroll before scraping
 - [x] Retry until downloading videos successfully
@@ -7,3 +9,9 @@
 - [ ] Auto bypassing tiktok captcha
 - [x] Scrape video captions and rename downloaded files
 - [ ] Convert to TypeScript
+
+
+## Credits
+
+- Scrape Tiktok videos timestamps: [RYAN BENSON - Tinkering with TikTok Timestamps](https://dfir.blog/tinkering-with-tiktok-timestamps/)
+- Tiktok scraper without watermark: [MRHRTZ - Tiktok-Scraper-Without-Watermark](https://github.com/MRHRTZ/Tiktok-Scraper-Without-Watermark)

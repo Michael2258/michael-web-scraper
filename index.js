@@ -3,7 +3,6 @@ import fs from "fs"
 import axios from "axios"
 import net from "net"
 import { tiktokdownload } from "tiktok-scraper-without-watermark"
-import path from "path"
 
 async function logger(logs) {
   try {
